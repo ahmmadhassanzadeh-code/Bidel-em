@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1a472a">
 <title>بیدل — ثبت امتیاز</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
@@ -66,7 +67,7 @@
   .stats-title{font-weight:bold;color:#ffd700;margin-bottom:8px;font-size:16px}
   .empty-stats{text-align:center;opacity:.5;padding:16px;font-size:14px}
 
-  .tg-hint{background:rgba(255,215,0,.15);border:1px dashed #ffd700;border-radius:10px;padding:10px;text-align:center;font-size:13px;margin-bottom:12px;color:#ffd700;display:none}
+  .loading-box{text-align:center;padding:20px;color:#ffd700;font-size:14px}
 </style>
 </head>
 <body>
@@ -74,124 +75,121 @@
   <h1>♥ بیدل — ثبت امتیاز ♠</h1>
   <p class="sub">ثبت امتیاز دوره‌ای بازی بیدل</p>
 
-  <div class="tg-hint" id="tg-hint">🚀 در حال اجرا داخل تلگرام</div>
+  <div class="loading-box" id="loading-box">⏳ در حال بارگذاری آمار...</div>
 
-  <div class="box" id="stats-box">
-    <div class="stats-title">📊 آمار کلی همه بازی‌ها</div>
-    <table class="stats-table">
-      <thead>
-        <tr><th>بازیکن</th><th>🏆 اول شد</th><th>💔 آخر شد</th><th>🌙 Moon زد</th></tr>
-      </thead>
-      <tbody id="stats-body">
-        <tr><td colspan="4" class="empty-stats">هنوز آماری ثبت نشده</td></tr>
-      </tbody>
-    </table>
-    <div style="text-align:center;margin-top:10px">
-      <button class="bd-btn red" style="font-size:12px;padding:6px 14px" onclick="resetStats()">🗑 ریست آمار کلی</button>
-    </div>
-  </div>
+  <div id="app-content" style="display:none">
 
-  <div class="box" id="setup-box">
-    <div style="font-weight:bold;margin-bottom:12px;color:#ffd700;text-align:center;font-size:15px">👤 نام ۴ بازیکن</div>
-    <div style="display:flex;flex-direction:column;gap:10px;align-items:center">
-      <div><input class="inp name-inp" id="n0" placeholder="بازیکن ۱" value="احمد"></div>
-      <div><input class="inp name-inp" id="n1" placeholder="بازیکن ۲" value="مهدی"></div>
-      <div><input class="inp name-inp" id="n2" placeholder="بازیکن ۳" value="مرتضی"></div>
-      <div><input class="inp name-inp" id="n3" placeholder="بازیکن ۴" value="صادق"></div>
-    </div>
-    <div style="text-align:center;margin-top:14px">
-      <button class="bd-btn" onclick="startGame()">🎮 شروع بازی</button>
-    </div>
-  </div>
-
-  <div id="game-area" style="display:none">
-    <div class="end-banner" id="end-banner"></div>
-    <div class="tie-banner" id="tie-banner"></div>
-    <div class="wbanner" id="wbanner"></div>
-
-    <div style="margin-bottom:12px">
-      <div class="hrow"><span style="min-width:70px">بازیکن</span><span style="flex:1;text-align:center">جمع کل</span></div>
-      <div id="plist"></div>
-    </div>
-
-    <div class="box" id="round-box">
-      <div style="font-weight:bold;margin-bottom:10px;color:#ffd700;text-align:center;font-size:15px" id="rtitle">➕ ثبت دور جدید</div>
-      <div id="inparea" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
-      <div style="display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-        <label class="chk">
-          <input type="checkbox" id="moonchk" onchange="onMoonToggle()">
-          <span>🌙 Moon</span>
-        </label>
-        <select id="moonsel" class="sel" style="display:none" onchange="onMoonSel()">
-          <option value="">کی Moon زد؟</option>
-        </select>
-        <span class="hint" id="autohint">✨ خودکار پر شد</span>
+    <div class="box" id="stats-box">
+      <div class="stats-title">📊 آمار کلی همه بازی‌ها</div>
+      <table class="stats-table">
+        <thead>
+          <tr><th>بازیکن</th><th>🏆 اول شد</th><th>💔 آخر شد</th><th>🌙 Moon زد</th></tr>
+        </thead>
+        <tbody id="stats-body">
+          <tr><td colspan="4" class="empty-stats">هنوز آماری ثبت نشده</td></tr>
+        </tbody>
+      </table>
+      <div style="text-align:center;margin-top:10px">
+        <button class="bd-btn red" style="font-size:12px;padding:6px 14px" onclick="resetStats()">🗑 ریست آمار کلی</button>
       </div>
-      <div style="text-align:center">
-        <button class="bd-btn" id="sbtn" onclick="saveRound()">💾 ثبت دور</button>
-        <button class="bd-btn sec" id="cbtn" onclick="cancelEdit()" style="display:none">❌ لغو</button>
-      </div>
-      <div id="valmsg"></div>
     </div>
 
-    <div class="box" style="border:1px solid rgba(255,82,82,.3)">
-      <div style="font-weight:bold;margin-bottom:10px;color:#ff5252;text-align:center;font-size:15px">⚠️ جریمه اضافی (۱ تا ۲۶)</div>
-      <div style="display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-        <select id="pen-player" class="sel">
-          <option value="">انتخاب بازیکن...</option>
-        </select>
-        <input type="number" class="inp" id="pen-amount" min="1" max="26" placeholder="۱ تا ۲۶" style="width:90px">
-        <button class="bd-btn penalty-btn" onclick="addPenalty()">➕ ثبت جریمه</button>
+    <div class="box" id="setup-box">
+      <div style="font-weight:bold;margin-bottom:12px;color:#ffd700;text-align:center;font-size:15px">👤 نام ۴ بازیکن</div>
+      <div style="display:flex;flex-direction:column;gap:10px;align-items:center">
+        <div><input class="inp name-inp" id="n0" placeholder="بازیکن ۱" value="احمد"></div>
+        <div><input class="inp name-inp" id="n1" placeholder="بازیکن ۲" value="مهدی"></div>
+        <div><input class="inp name-inp" id="n2" placeholder="بازیکن ۳" value="مرتضی"></div>
+        <div><input class="inp name-inp" id="n3" placeholder="بازیکن ۴" value="صادق"></div>
       </div>
-      <div id="pen-list" style="margin-top:8px"></div>
+      <div style="text-align:center;margin-top:14px">
+        <button class="bd-btn" onclick="startGame()">🎮 شروع بازی</button>
+      </div>
     </div>
 
-    <div>
-      <div style="font-weight:bold;margin-bottom:6px;color:#ffd700;display:flex;justify-content:space-between;align-items:center">
-        <span>📜 تاریخچه</span>
-        <button class="bd-btn sec" style="padding:5px 12px;font-size:12px" onclick="askReset()">🔄 بازی جدید</button>
-      </div>
-      <div class="hrow" id="history-header">
-        <span style="min-width:40px">دور</span>
-        <span class="rsc" id="hh0">احمد</span>
-        <span class="rsc" id="hh1">مهدی</span>
-        <span class="rsc" id="hh2">مرتضی</span>
-        <span class="rsc" id="hh3">صادق</span>
-        <span style="min-width:60px;text-align:left"></span>
-      </div>
-      <div id="rlist"></div>
-    </div>
-  </div>
+    <div id="game-area" style="display:none">
+      <div class="end-banner" id="end-banner"></div>
+      <div class="tie-banner" id="tie-banner"></div>
+      <div class="wbanner" id="wbanner"></div>
 
-  <div class="modal" id="rmodal" onclick="if(event.target===this)closeReset()">
-    <div class="mbox">
-      <div style="font-size:17px;font-weight:bold;margin-bottom:10px">⚠️ پاک کردن؟</div>
-      <p style="margin-bottom:14px;opacity:.9;font-size:14px">دورها، امتیازات و جریمه‌ها حذف می‌شن. اسم‌ها و آمار کلی می‌مونن.</p>
-      <button class="bd-btn red" onclick="doReset()">بله، پاک کن</button>
-      <button class="bd-btn sec" onclick="closeReset()">نه</button>
-    </div>
-  </div>
+      <div style="margin-bottom:12px">
+        <div class="hrow"><span style="min-width:70px">بازیکن</span><span style="flex:1;text-align:center">جمع کل</span></div>
+        <div id="plist"></div>
+      </div>
 
-  <div class="modal" id="finish-modal" onclick="if(event.target===this)closeFinish()">
-    <div class="mbox">
-      <div style="font-size:20px;font-weight:bold;margin-bottom:10px;color:#ffd700">🏁 بازی تمام شد!</div>
-      <div id="finish-result" style="margin-bottom:16px;font-size:15px;line-height:1.8"></div>
-      <button class="bd-btn" onclick="closeFinish()">✅ باشه</button>
+      <div class="box" id="round-box">
+        <div style="font-weight:bold;margin-bottom:10px;color:#ffd700;text-align:center;font-size:15px" id="rtitle">➕ ثبت دور جدید</div>
+        <div id="inparea" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
+        <div style="display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <label class="chk">
+            <input type="checkbox" id="moonchk" onchange="onMoonToggle()">
+            <span>🌙 Moon</span>
+          </label>
+          <select id="moonsel" class="sel" style="display:none" onchange="onMoonSel()">
+            <option value="">کی Moon زد؟</option>
+          </select>
+          <span class="hint" id="autohint">✨ خودکار پر شد</span>
+        </div>
+        <div style="text-align:center">
+          <button class="bd-btn" id="sbtn" onclick="saveRound()">💾 ثبت دور</button>
+          <button class="bd-btn sec" id="cbtn" onclick="cancelEdit()" style="display:none">❌ لغو</button>
+        </div>
+        <div id="valmsg"></div>
+      </div>
+
+      <div class="box" style="border:1px solid rgba(255,82,82,.3)">
+        <div style="font-weight:bold;margin-bottom:10px;color:#ff5252;text-align:center;font-size:15px">⚠️ جریمه اضافی (۱ تا ۲۶)</div>
+        <div style="display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <select id="pen-player" class="sel">
+            <option value="">انتخاب بازیکن...</option>
+          </select>
+          <input type="number" class="inp" id="pen-amount" min="1" max="26" placeholder="۱ تا ۲۶" style="width:90px">
+          <button class="bd-btn penalty-btn" onclick="addPenalty()">➕ ثبت جریمه</button>
+        </div>
+        <div id="pen-list" style="margin-top:8px"></div>
+      </div>
+
+      <div>
+        <div style="font-weight:bold;margin-bottom:6px;color:#ffd700;display:flex;justify-content:space-between;align-items:center">
+          <span>📜 تاریخچه</span>
+          <button class="bd-btn sec" style="padding:5px 12px;font-size:12px" onclick="askReset()">🔄 بازی جدید</button>
+        </div>
+        <div class="hrow" id="history-header">
+          <span style="min-width:40px">دور</span>
+          <span class="rsc" id="hh0">احمد</span>
+          <span class="rsc" id="hh1">مهدی</span>
+          <span class="rsc" id="hh2">مرتضی</span>
+          <span class="rsc" id="hh3">صادق</span>
+          <span style="min-width:60px;text-align:left"></span>
+        </div>
+        <div id="rlist"></div>
+      </div>
+    </div>
+
+    <div class="modal" id="rmodal" onclick="if(event.target===this)closeReset()">
+      <div class="mbox">
+        <div style="font-size:17px;font-weight:bold;margin-bottom:10px">⚠️ پاک کردن؟</div>
+        <p style="margin-bottom:14px;opacity:.9;font-size:14px">دورها، امتیازات و جریمه‌ها حذف می‌شن. اسم‌ها و آمار کلی می‌مونن.</p>
+        <button class="bd-btn red" onclick="doReset()">بله، پاک کن</button>
+        <button class="bd-btn sec" onclick="closeReset()">نه</button>
+      </div>
+    </div>
+
+    <div class="modal" id="finish-modal" onclick="if(event.target===this)closeFinish()">
+      <div class="mbox">
+        <div style="font-size:20px;font-weight:bold;margin-bottom:10px;color:#ffd700">🏁 بازی تمام شد!</div>
+        <div id="finish-result" style="margin-bottom:16px;font-size:15px;line-height:1.8"></div>
+        <button class="bd-btn" onclick="closeFinish()">✅ باشه</button>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
-var tg = window.Telegram && window.Telegram.WebApp;
-if(tg){
-  tg.ready();
-  tg.expand();
-  tg.setHeaderColor('#1a472a');
-  tg.setBackgroundColor('#0d2818');
-  document.getElementById('tg-hint').style.display='block';
-}
-
 (function(){
+  var tg = window.Telegram && window.Telegram.WebApp;
+  if(tg){ tg.ready(); tg.expand(); }
+
   var NAMES=['','','',''];
   var rounds=[];
   var penalties=[];
@@ -201,8 +199,49 @@ if(tg){
   var needExtraRound=false;
   var tieBreakMode=false;
   var stats={};
+  var storageReady=false;
 
   function $(id){return document.getElementById(id);}
+
+  /* ===== Storage: Telegram cloudStorage + localStorage fallback ===== */
+  function storageGet(callback){
+    if(tg && tg.cloudStorage){
+      tg.cloudStorage.getItem('bidel_stats_v2', function(err, val){
+        if(!err && val){
+          try{ stats=JSON.parse(val); }catch(e){ stats={}; }
+        }else{
+          var s=localStorage.getItem('bidel_stats_v2');
+          if(s){ try{ stats=JSON.parse(s); }catch(e){ stats={}; } }
+        }
+        storageReady=true;
+        if(callback) callback();
+      });
+    }else{
+      var s=localStorage.getItem('bidel_stats_v2');
+      if(s){ try{ stats=JSON.parse(s); }catch(e){ stats={}; } }
+      storageReady=true;
+      if(callback) callback();
+    }
+  }
+
+  function storageSave(){
+    var json=JSON.stringify(stats);
+    localStorage.setItem('bidel_stats_v2', json);
+    if(tg && tg.cloudStorage){
+      tg.cloudStorage.setItem('bidel_stats_v2', json);
+    }
+  }
+
+  function resetStats(){
+    if(!confirm('آمار کلی همه بازی‌ها پاک بشه؟'))return;
+    stats={}; storageSave(); renderStats();
+  }
+  function ensurePlayer(name){
+    if(!stats[name]) stats[name]={first:0,last:0,moon:0};
+  }
+  function addFirst(name){ ensurePlayer(name); stats[name].first++; storageSave(); }
+  function addLast(name){ ensurePlayer(name); stats[name].last++; storageSave(); }
+  function addMoon(name){ ensurePlayer(name); stats[name].moon++; storageSave(); }
 
   function getNames(){
     for(var i=0;i<4;i++){
@@ -211,51 +250,27 @@ if(tg){
     }
   }
 
-  function storageGet(key,def){
-    try{var s=localStorage.getItem(key);if(s)return JSON.parse(s);}catch(e){}
-    return def;
-  }
-  function storageSet(key,val){
-    try{localStorage.setItem(key,JSON.stringify(val));}catch(e){}
-  }
-
-  function loadStats(){stats=storageGet('bidel_stats_v2',{});}
-  function saveStats(){storageSet('bidel_stats_v2',stats);}
-  function resetStats(){
-    if(!confirm('آمار کلی همه بازی‌ها پاک بشه؟'))return;
-    stats={};saveStats();renderStats();
-  }
-  function ensurePlayer(name){
-    if(!stats[name])stats[name]={first:0,last:0,moon:0};
-  }
-  function addFirst(name){ensurePlayer(name);stats[name].first++;saveStats();}
-  function addLast(name){ensurePlayer(name);stats[name].last++;saveStats();}
-  function addMoon(name){ensurePlayer(name);stats[name].moon++;saveStats();}
-
-  loadStats();
-
   function updateHeaders(){
-    for(var i=0;i<4;i++){var el=$('hh'+i);if(el)el.textContent=NAMES[i];}
-    var sel=$('moonsel');var opts='<option value="">کی Moon زد؟</option>';
-    for(var i=0;i<4;i++)opts+='<option value="'+i+'">'+NAMES[i]+'</option>';
+    for(var i=0;i<4;i++){ var el=$('hh'+i); if(el) el.textContent=NAMES[i]; }
+    var sel=$('moonsel'); var opts='<option value="">کی Moon زد؟</option>';
+    for(var i=0;i<4;i++) opts+='<option value="'+i+'">'+NAMES[i]+'</option>';
     sel.innerHTML=opts;
-    var psel=$('pen-player');var popts='<option value="">انتخاب بازیکن...</option>';
-    for(var i=0;i<4;i++)popts+='<option value="'+i+'">'+NAMES[i]+'</option>';
+    var psel=$('pen-player'); var popts='<option value="">انتخاب بازیکن...</option>';
+    for(var i=0;i<4;i++) popts+='<option value="'+i+'">'+NAMES[i]+'</option>';
     psel.innerHTML=popts;
   }
 
   window.startGame=function(){
-    getNames();updateHeaders();
+    getNames(); updateHeaders();
     $('setup-box').style.display='none';
     $('game-area').style.display='block';
     renderAll();
-    if(tg) tg.expand();
   };
 
   function getTotals(){
     var t=[0,0,0,0];
-    for(var r=0;r<rounds.length;r++)for(var i=0;i<4;i++)t[i]+=rounds[r].scores[i];
-    for(var p=0;p<penalties.length;p++)t[penalties[p].player]+=penalties[p].amount;
+    for(var r=0;r<rounds.length;r++) for(var i=0;i<4;i++) t[i]+=rounds[r].scores[i];
+    for(var p=0;p<penalties.length;p++) t[penalties[p].player]+=penalties[p].amount;
     return t;
   }
 
@@ -270,45 +285,45 @@ if(tg){
       var winBadge=isFirst?'<span class="badge">🏆</span>':'';
       var lastBadge=isLast?'<span class="badge badge-last">💔</span>':'';
       var penSum=0;
-      for(var p=0;p<penalties.length;p++)if(penalties[p].player===i)penSum+=penalties[p].amount;
+      for(var p=0;p<penalties.length;p++) if(penalties[p].player===i) penSum+=penalties[p].amount;
       var penText=penSum>0?'<span class="ppenalty">(جریمه: '+penSum+')</span>':'';
       html+='<div class="pcard"><span class="pname">'+NAMES[i]+winBadge+lastBadge+penText+'</span><span class="ptotal">'+t[i]+'</span></div>';
     }
     $('plist').innerHTML=html;
 
-    var wb=$('wbanner');var tb=$('tie-banner');var eb=$('end-banner');
+    var wb=$('wbanner'); var tb=$('tie-banner'); var eb=$('end-banner');
     if(gameOver){
-      eb.style.display='block';tb.style.display='none';wb.style.display='none';
+      eb.style.display='block'; tb.style.display='none'; wb.style.display='none';
       eb.innerHTML='🏁 بازی تمام شده — برای بازی جدید «بازی جدید» رو بزن';
       return;
     }
     if(rounds.length>0||penalties.length>0){
       var firsts=[],lasts=[];
-      for(var i=0;i<4;i++){if(t[i]===min)firsts.push(i);if(t[i]===max)lasts.push(i);}
+      for(var i=0;i<4;i++){ if(t[i]===min) firsts.push(i); if(t[i]===max) lasts.push(i); }
       if(tieBreakMode){
-        wb.style.display='none';tb.style.display='block';
+        wb.style.display='none'; tb.style.display='block';
         tb.innerHTML='⚖️ اول یا آخر مشخص نیست! یه دور دیگه بازی کنید';
       }else if(needExtraRound){
-        wb.style.display='none';tb.style.display='block';
+        wb.style.display='none'; tb.style.display='block';
         tb.innerHTML='⏳ چند نفر از ۱۰۰ گذشتن! یه دور دیگه بازی کنید';
       }else{
-        var ws=[];for(var i=0;i<firsts.length;i++)ws.push(NAMES[firsts[i]]);
-        var ls=[];for(var i=0;i<lasts.length;i++)ls.push(NAMES[lasts[i]]);
-        wb.style.display='block';tb.style.display='none';
+        var ws=[]; for(var i=0;i<firsts.length;i++) ws.push(NAMES[firsts[i]]);
+        var ls=[]; for(var i=0;i<lasts.length;i++) ls.push(NAMES[lasts[i]]);
+        wb.style.display='block'; tb.style.display='none';
         wb.innerHTML='🏆 '+ws.join(' و ')+' با '+min+' امتیاز پیشتاز'+(ws.length>1?'ند':'')+' 💔 '+ls.join(' و ')+' '+max+' امتیاز';
       }
     }else{
-      wb.style.display='none';tb.style.display='none';
+      wb.style.display='none'; tb.style.display='none';
     }
     eb.style.display='none';
   }
 
   function calcFourth(){
-    if(moonOn)return;
+    if(moonOn) return;
     var filled=0,sum=0,emptyIdx=-1;
     for(var i=0;i<4;i++){
       var v=parseInt($('in-'+i).value);
-      if(!isNaN(v)){filled++;sum+=v;}else{emptyIdx=i;}
+      if(!isNaN(v)){ filled++; sum+=v; }else{ emptyIdx=i; }
     }
     if(filled===3&&emptyIdx>=0&&sum<=26){
       var remain=26-sum;
@@ -320,7 +335,7 @@ if(tg){
   }
 
   function renderInputs(){
-    if(gameOver){$('round-box').classList.add('game-over');return;}
+    if(gameOver){ $('round-box').classList.add('game-over'); return; }
     $('round-box').classList.remove('game-over');
     var html='';
     for(var i=0;i<4;i++){
@@ -328,27 +343,19 @@ if(tg){
       html+='<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><span style="font-weight:bold;min-width:80px">'+NAMES[i]+'</span><input type="number" class="inp" id="in-'+i+'" value="'+v+'" min="0" max="26" placeholder="0" oninput="onInputChange('+i+')"></div>';
     }
     $('inparea').innerHTML=html;
-    $('moonchk').checked=false;
-    $('moonsel').value='';
-    $('moonsel').style.display='none';
-    $('autohint').style.display='none';
-    moonOn=false;
+    $('moonchk').checked=false; $('moonsel').value=''; $('moonsel').style.display='none'; $('autohint').style.display='none'; moonOn=false;
     if(editIdx>=0&&rounds[editIdx].moon!==null){
-      $('moonchk').checked=true;
-      $('moonsel').value=rounds[editIdx].moon;
-      $('moonsel').style.display='inline-block';
-      moonOn=true;
-      applyAuto();
+      $('moonchk').checked=true; $('moonsel').value=rounds[editIdx].moon; $('moonsel').style.display='inline-block'; moonOn=true; applyAuto();
     }
   }
 
   function applyAuto(){
     var mp=$('moonsel').value;
-    if(mp==='')return;
+    if(mp==='') return;
     var m=parseInt(mp);
     for(var i=0;i<4;i++){
       var inp=$('in-'+i);
-      if(!inp)continue;
+      if(!inp) continue;
       inp.value=(i===m?0:26);
       inp.classList.add('auto');
       inp.disabled=true;
@@ -359,10 +366,8 @@ if(tg){
   function clearAuto(){
     for(var i=0;i<4;i++){
       var inp=$('in-'+i);
-      if(!inp)continue;
-      inp.value='';
-      inp.classList.remove('auto');
-      inp.disabled=false;
+      if(!inp) continue;
+      inp.value=''; inp.classList.remove('auto'); inp.disabled=false;
     }
     $('autohint').style.display='none';
   }
@@ -370,20 +375,13 @@ if(tg){
   window.onMoonToggle=function(){
     moonOn=$('moonchk').checked;
     $('moonsel').style.display=moonOn?'inline-block':'none';
-    if(!moonOn){
-      $('moonsel').value='';
-      clearAuto();
-    }else if($('moonsel').value!==''){
-      applyAuto();
-    }
+    if(!moonOn){ $('moonsel').value=''; clearAuto(); }
+    else if($('moonsel').value!==''){ applyAuto(); }
     validate();
   };
   window.onMoonSel=function(){
-    if(moonOn&&$('moonsel').value!==''){
-      clearAuto();applyAuto();
-    }else{
-      clearAuto();
-    }
+    if(moonOn&&$('moonsel').value!==''){ clearAuto(); applyAuto(); }
+    else{ clearAuto(); }
     validate();
   };
   window.onInputChange=function(idx){
@@ -394,26 +392,25 @@ if(tg){
   };
 
   window.addPenalty=function(){
-    if(gameOver){alert('بازی تموم شده! «بازی جدید» رو بزن.');return;}
+    if(gameOver){ alert('بازی تموم شده! «بازی جدید» رو بزن.'); return; }
     var p=$('pen-player').value;
     var a=parseInt($('pen-amount').value);
-    if(p===''){alert('بازیکن رو انتخاب کن!');return;}
-    if(isNaN(a)||a<1||a>26){alert('جریمه باید بین ۱ تا ۲۶ باشه!');return;}
+    if(p===''){ alert('بازیکن رو انتخاب کن!'); return; }
+    if(isNaN(a)||a<1||a>26){ alert('جریمه باید بین ۱ تا ۲۶ باشه!'); return; }
     penalties.push({player:parseInt(p),amount:a});
-    $('pen-player').value='';
-    $('pen-amount').value='';
-    renderAll();checkEnd();
+    $('pen-player').value=''; $('pen-amount').value='';
+    renderAll(); checkEnd();
   };
 
   window.delPenalty=function(idx){
-    if(!confirm('این جریمه حذف بشه؟'))return;
+    if(!confirm('این جریمه حذف بشه؟')) return;
     penalties.splice(idx,1);
     renderAll();
   };
 
   function renderPenalties(){
     var el=$('pen-list');
-    if(penalties.length===0){el.innerHTML='';return;}
+    if(penalties.length===0){ el.innerHTML=''; return; }
     var html='<div style="font-size:13px;margin-bottom:4px;opacity:.7">📋 لیست جریمه‌ها:</div>';
     for(var i=0;i<penalties.length;i++){
       var p=penalties[i];
@@ -437,201 +434,4 @@ if(tg){
       var r=rounds[idx];
       html+='<div class="rrow '+(idx===editIdx?'edit':'')+'"><span class="rnum">دور '+(idx+1)+'</span><div style="display:flex;gap:6px;flex:1;justify-content:center">';
       for(var i=0;i<4;i++){
-        var mark=r.moon===i?' 🌙':'';
-        html+='<span class="rsc">'+r.scores[i]+mark+'</span>';
-      }
-      html+='</div><div style="min-width:60px;text-align:left"><button class="bd-btn sec" style="padding:3px 7px;font-size:11px" onclick="editRound('+idx+')">✏️</button><button class="bd-btn red" style="padding:3px 7px;font-size:11px" onclick="delRound('+idx+')">🗑</button></div></div>';
-    }
-    el.innerHTML=html;
-  }
-
-  function renderStats(){
-    var tbody=$('stats-body');
-    var keys=Object.keys(stats);
-    if(keys.length===0){
-      tbody.innerHTML='<tr><td colspan="4" class="empty-stats">هنوز آماری ثبت نشده</td></tr>';
-      return;
-    }
-    var html='';
-    for(var k=0;k<keys.length;k++){
-      var name=keys[k];
-      var s=stats[name];
-      html+='<tr><td style="font-weight:bold">'+name+'</td><td style="color:#ffd700;font-weight:bold">'+s.first+'</td><td style="color:#ff5252;font-weight:bold">'+s.last+'</td><td style="color:#81c784;font-weight:bold">'+s.moon+'</td></tr>';
-    }
-    tbody.innerHTML=html;
-  }
-
-  window.validate=function(){
-    var msg=$('valmsg');
-    var moonChecked=$('moonchk').checked;
-    var moonPlayer=$('moonsel').value;
-    if(moonChecked&&moonPlayer===''){msg.textContent='❌ کی Moon زده رو انتخاب کن';return false;}
-    var scores=[],sum=0,empty=0;
-    for(var i=0;i<4;i++){
-      var v=parseInt($('in-'+i).value);
-      if(isNaN(v)){empty++;}else{scores.push(v);sum+=v;}
-    }
-    if(empty>0&&!moonChecked){msg.textContent='';return false;}
-    if(moonChecked){
-      var mp=parseInt(moonPlayer);
-      if(scores[mp]!==0){msg.textContent='❌ Moon‌زن باید ۰ باشه';return false;}
-      var os=0;
-      for(var i=0;i<4;i++)if(i!==mp)os+=scores[i];
-      if(os!==78){msg.textContent='❌ ۳ نفر دیگه باید مجموعاً ۷۸ باشن';return false;}
-    }else{
-      if(sum!==26){msg.textContent='❌ مجموع باید ۲۶ باشه (الان: '+sum+')';return false;}
-    }
-    msg.textContent='';
-    return true;
-  };
-
-  window.saveRound=function(){
-    if(gameOver){alert('بازی تموم شده! «بازی جدید» رو بزن.');return;}
-    if(!validate())return;
-    var moonChecked=$('moonchk').checked;
-    var moonPlayer=moonChecked?parseInt($('moonsel').value):null;
-    var scores=[];
-    for(var i=0;i<4;i++)scores.push(parseInt($('in-'+i).value)||0);
-    var data={scores:scores,moon:moonPlayer};
-    if(editIdx>=0){
-      rounds[editIdx]=data;
-      editIdx=-1;
-      $('rtitle').textContent='➕ ثبت دور جدید';
-      $('sbtn').textContent='💾 ثبت دور';
-      $('cbtn').style.display='none';
-    }else{
-      rounds.push(data);
-    }
-    for(var i=0;i<4;i++){
-      var inp=$('in-'+i);
-      if(inp){inp.value='';inp.classList.remove('auto');inp.disabled=false;}
-    }
-    $('moonchk').checked=false;
-    $('moonsel').value='';
-    $('moonsel').style.display='none';
-    $('autohint').style.display='none';
-    $('valmsg').textContent='';
-    moonOn=false;
-    renderAll();checkEnd();
-  };
-
-  function checkEnd(){
-    if(gameOver)return;
-    var t=getTotals();
-    var over100=[];
-    for(var i=0;i<4;i++)if(t[i]>=100)over100.push(i);
-
-    if(tieBreakMode){
-      var min=Math.min.apply(null,t);
-      var max=Math.max.apply(null,t);
-      var firsts=[],lasts=[];
-      for(var i=0;i<4;i++){if(t[i]===min)firsts.push(i);if(t[i]===max)lasts.push(i);}
-      if(firsts.length===1&&lasts.length===1){
-        finishGame(firsts[0],lasts[0],min,max);
-      }
-      return;
-    }
-
-    if(needExtraRound){
-      needExtraRound=false;
-      var min=Math.min.apply(null,t);
-      var max=Math.max.apply(null,t);
-      var firsts=[],lasts=[];
-      for(var i=0;i<4;i++){if(t[i]===min)firsts.push(i);if(t[i]===max)lasts.push(i);}
-      if(firsts.length===1&&lasts.length===1){
-        finishGame(firsts[0],lasts[0],min,max);
-      }else{
-        tieBreakMode=true;renderTotals();
-      }
-      return;
-    }
-
-    if(over100.length===1){
-      var min=Math.min.apply(null,t);
-      var max=Math.max.apply(null,t);
-      var firsts=[],lasts=[];
-      for(var i=0;i<4;i++){if(t[i]===min)firsts.push(i);if(t[i]===max)lasts.push(i);}
-      if(firsts.length===1&&lasts.length===1){
-        finishGame(firsts[0],lasts[0],min,max);
-      }else{
-        tieBreakMode=true;renderTotals();
-      }
-      return;
-    }
-
-    if(over100.length>=2){
-      needExtraRound=true;renderTotals();
-      alert('⏰ '+over100.length+' نفر از ۱۰۰ گذشتن! یه دور دیگه بازی کنید، بعدش بازی تموم می‌شه.');
-      return;
-    }
-  }
-
-  function finishGame(winnerIdx,loserIdx,minScore,maxScore){
-    gameOver=true;
-    var winnerName=NAMES[winnerIdx];
-    var loserName=NAMES[loserIdx];
-    addFirst(winnerName);
-    addLast(loserName);
-    for(var r=0;r<rounds.length;r++)if(rounds[r].moon!==null)addMoon(NAMES[rounds[r].moon]);
-    renderTotals();renderStats();
-    var resultHTML='<div style="color:#ffd700;font-size:18px;margin-bottom:8px">🏆 برنده: '+winnerName+' ('+minScore+' امتیاز)</div>';
-    resultHTML+='<div style="color:#ff5252;font-size:16px;margin-bottom:12px">💔 آخرین نفر: '+loserName+' ('+maxScore+' امتیاز)</div>';
-    resultHTML+='<div style="font-size:13px;opacity:.8">برای بازی جدید «🔄 بازی جدید» رو بزن</div>';
-    $('finish-result').innerHTML=resultHTML;
-    $('finish-modal').style.display='flex';
-    if(tg){
-      tg.HapticFeedback.notificationOccurred('success');
-      tg.MainButton.setText('اشتراک نتیجه');
-      tg.MainButton.show();
-      tg.MainButton.onClick(function(){
-        var shareText='🏆 بیدل\n\n';
-        var t=getTotals();
-        var sorted=NAMES.map(function(n,i){return{name:n,score:t[i]};});
-        sorted.sort(function(a,b){return a.score-b.score;});
-        for(var i=0;i<4;i++)shareText+=(i+1)+'. '+sorted[i].name+': '+sorted[i].score+'\n';
-        tg.sendData(JSON.stringify({action:'share',text:shareText}));
-      });
-    }
-  }
-
-  window.closeFinish=function(){$('finish-modal').style.display='none';if(tg)tg.MainButton.hide();};
-
-  window.editRound=function(idx){
-    if(gameOver)return;
-    editIdx=idx;
-    $('rtitle').textContent='✏️ ویرایش دور '+(idx+1);
-    $('sbtn').textContent='💾 ذخیره';
-    $('cbtn').style.display='inline-block';
-    renderInputs();
-    validate();
-  };
-  window.cancelEdit=function(){
-    editIdx=-1;
-    $('rtitle').textContent='➕ ثبت دور جدید';
-    $('sbtn').textContent='💾 ثبت دور';
-    $('cbtn').style.display='none';
-    moonOn=false;
-    renderInputs();
-    $('valmsg').textContent='';
-  };
-  window.delRound=function(idx){
-    if(!confirm('دور '+(idx+1)+' حذف بشه؟'))return;
-    rounds.splice(idx,1);
-    if(editIdx===idx)cancelEdit();
-    else if(editIdx>idx)editIdx--;
-    renderAll();
-  };
-
-  window.askReset=function(){$('rmodal').style.display='flex';};
-  window.closeReset=function(){$('rmodal').style.display='none';};
-  window.doReset=function(){
-    rounds=[];penalties=[];editIdx=-1;moonOn=false;gameOver=false;needExtraRound=false;tieBreakMode=false;
-    cancelEdit();closeReset();closeFinish();renderAll();
-  };
-
-  function renderAll(){renderTotals();renderHistory();renderPenalties();if(editIdx<0)renderInputs();}
-  renderStats();
-})();
-</script>
-</body>
-</html>
+        var
