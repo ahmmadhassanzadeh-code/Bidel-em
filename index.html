@@ -68,6 +68,7 @@
   .empty-stats{text-align:center;opacity:.5;padding:16px;font-size:14px}
 
   .loading-box{text-align:center;padding:20px;color:#ffd700;font-size:14px}
+  .error-box{text-align:center;padding:16px;color:#ff5252;font-size:13px;background:rgba(255,82,82,.1);border-radius:10px;margin-bottom:12px;display:none}
 </style>
 </head>
 <body>
@@ -76,6 +77,7 @@
   <p class="sub">ثبت امتیاز دوره‌ای بازی بیدل</p>
 
   <div class="loading-box" id="loading-box">⏳ در حال بارگذاری آمار...</div>
+  <div class="error-box" id="error-box"></div>
 
   <div id="app-content" style="display:none">
 
@@ -187,8 +189,14 @@
 
 <script>
 (function(){
-  var tg = window.Telegram && window.Telegram.WebApp;
-  if(tg){ tg.ready(); tg.expand(); }
+  var tg = null;
+  try {
+    if(window.Telegram && window.Telegram.WebApp){
+      tg = window.Telegram.WebApp;
+      tg.ready();
+      tg.expand();
+    }
+  } catch(e){ tg = null; }
 
   var NAMES=['','','',''];
   var rounds=[];
@@ -200,44 +208,70 @@
   var tieBreakMode=false;
   var stats={};
   var storageReady=false;
+  var useCloud = false;
 
   function $(id){return document.getElementById(id);}
 
-  /* ===== Storage: Telegram cloudStorage + localStorage fallback ===== */
+  /* ===== Storage with timeout and fallback ===== */
   function storageGet(callback){
-    if(tg && tg.cloudStorage){
-      tg.cloudStorage.getItem('bidel_stats_v2', function(err, val){
-        if(!err && val){
-          try{ stats=JSON.parse(val); }catch(e){ stats={}; }
-        }else{
-          var s=localStorage.getItem('bidel_stats_v2');
-          if(s){ try{ stats=JSON.parse(s); }catch(e){ stats={}; } }
-        }
-        storageReady=true;
+    var done = false;
+    var timeout = setTimeout(function(){
+      if(!done){
+        done = true;
+        // fallback to localStorage
+        var s = localStorage.getItem('bidel_stats_v2');
+        if(s){ try{ stats = JSON.parse(s); }catch(e){ stats = {}; } }
+        storageReady = true;
         if(callback) callback();
-      });
-    }else{
-      var s=localStorage.getItem('bidel_stats_v2');
-      if(s){ try{ stats=JSON.parse(s); }catch(e){ stats={}; } }
-      storageReady=true;
+      }
+    }, 2000);
+
+    // Try Telegram CloudStorage (capital C)
+    if(tg && tg.CloudStorage && tg.CloudStorage.getItem){
+      try {
+        tg.CloudStorage.getItem('bidel_stats_v2', function(err, val){
+          if(!done){
+            done = true; clearTimeout(timeout);
+            if(!err && val){
+              try{ stats = JSON.parse(val); }catch(e){ stats = {}; }
+              useCloud = true;
+            } else {
+              // fallback
+              var s = localStorage.getItem('bidel_stats_v2');
+              if(s){ try{ stats = JSON.parse(s); }catch(e){ stats = {}; } }
+            }
+            storageReady = true;
+            if(callback) callback();
+          }
+        });
+      } catch(e){
+        // will fallback via timeout
+      }
+    } else {
+      // No CloudStorage, cancel timeout and use localStorage immediately
+      clearTimeout(timeout);
+      done = true;
+      var s = localStorage.getItem('bidel_stats_v2');
+      if(s){ try{ stats = JSON.parse(s); }catch(e){ stats = {}; } }
+      storageReady = true;
       if(callback) callback();
     }
   }
 
   function storageSave(){
-    var json=JSON.stringify(stats);
+    var json = JSON.stringify(stats);
     localStorage.setItem('bidel_stats_v2', json);
-    if(tg && tg.cloudStorage){
-      tg.cloudStorage.setItem('bidel_stats_v2', json);
+    if(useCloud && tg && tg.CloudStorage && tg.CloudStorage.setItem){
+      try{ tg.CloudStorage.setItem('bidel_stats_v2', json); }catch(e){}
     }
   }
 
   function resetStats(){
-    if(!confirm('آمار کلی همه بازی‌ها پاک بشه؟'))return;
-    stats={}; storageSave(); renderStats();
+    if(!confirm('آمار کلی همه بازی‌ها پاک بشه؟')) return;
+    stats = {}; storageSave(); renderStats();
   }
   function ensurePlayer(name){
-    if(!stats[name]) stats[name]={first:0,last:0,moon:0};
+    if(!stats[name]) stats[name] = {first:0, last:0, moon:0};
   }
   function addFirst(name){ ensurePlayer(name); stats[name].first++; storageSave(); }
   function addLast(name){ ensurePlayer(name); stats[name].last++; storageSave(); }
@@ -245,8 +279,8 @@
 
   function getNames(){
     for(var i=0;i<4;i++){
-      var v=$('n'+i).value.trim();
-      NAMES[i]=v||('بازیکن '+(i+1));
+      var v = $('n'+i).value.trim();
+      NAMES[i] = v || ('بازیکن '+(i+1));
     }
   }
 
@@ -434,4 +468,188 @@
       var r=rounds[idx];
       html+='<div class="rrow '+(idx===editIdx?'edit':'')+'"><span class="rnum">دور '+(idx+1)+'</span><div style="display:flex;gap:6px;flex:1;justify-content:center">';
       for(var i=0;i<4;i++){
-        var
+        var mark=r.moon===i?' 🌙':'';
+        html+='<span class="rsc">'+r.scores[i]+mark+'</span>';
+      }
+      html+='</div><div style="min-width:60px;text-align:left"><button class="bd-btn sec" style="padding:3px 7px;font-size:11px" onclick="editRound('+idx+')">✏️</button><button class="bd-btn red" style="padding:3px 7px;font-size:11px" onclick="delRound('+idx+')">🗑</button></div></div>';
+    }
+    el.innerHTML=html;
+  }
+
+  function renderStats(){
+    var tbody=$('stats-body');
+    var keys=Object.keys(stats);
+    if(keys.length===0){
+      tbody.innerHTML='<tr><td colspan="4" class="empty-stats">هنوز آماری ثبت نشده</td></tr>';
+      return;
+    }
+    var html='';
+    for(var k=0;k<keys.length;k++){
+      var name=keys[k];
+      var s=stats[name];
+      html+='<tr><td style="font-weight:bold">'+name+'</td><td style="color:#ffd700;font-weight:bold">'+s.first+'</td><td style="color:#ff5252;font-weight:bold">'+s.last+'</td><td style="color:#81c784;font-weight:bold">'+s.moon+'</td></tr>';
+    }
+    tbody.innerHTML=html;
+  }
+
+  window.validate=function(){
+    var msg=$('valmsg');
+    var moonChecked=$('moonchk').checked;
+    var moonPlayer=$('moonsel').value;
+    if(moonChecked&&moonPlayer===''){ msg.textContent='❌ کی Moon زده رو انتخاب کن'; return false; }
+    var scores=[],sum=0,empty=0;
+    for(var i=0;i<4;i++){
+      var v=parseInt($('in-'+i).value);
+      if(isNaN(v)){ empty++; }else{ scores.push(v); sum+=v; }
+    }
+    if(empty>0&&!moonChecked){ msg.textContent=''; return false; }
+    if(moonChecked){
+      var mp=parseInt(moonPlayer);
+      if(scores[mp]!==0){ msg.textContent='❌ Moon‌زن باید ۰ باشه'; return false; }
+      var os=0;
+      for(var i=0;i<4;i++) if(i!==mp) os+=scores[i];
+      if(os!==78){ msg.textContent='❌ ۳ نفر دیگه باید مجموعاً ۷۸ باشن'; return false; }
+    }else{
+      if(sum!==26){ msg.textContent='❌ مجموع باید ۲۶ باشه (الان: '+sum+')'; return false; }
+    }
+    msg.textContent='';
+    return true;
+  };
+
+  window.saveRound=function(){
+    if(gameOver){ alert('بازی تموم شده! «بازی جدید» رو بزن.'); return; }
+    if(!validate()) return;
+    var moonChecked=$('moonchk').checked;
+    var moonPlayer=moonChecked?parseInt($('moonsel').value):null;
+    var scores=[];
+    for(var i=0;i<4;i++) scores.push(parseInt($('in-'+i).value)||0);
+    var data={scores:scores,moon:moonPlayer};
+    if(editIdx>=0){
+      rounds[editIdx]=data; editIdx=-1;
+      $('rtitle').textContent='➕ ثبت دور جدید';
+      $('sbtn').textContent='💾 ثبت دور';
+      $('cbtn').style.display='none';
+    }else{
+      rounds.push(data);
+    }
+    for(var i=0;i<4;i++){
+      var inp=$('in-'+i);
+      if(inp){ inp.value=''; inp.classList.remove('auto'); inp.disabled=false; }
+    }
+    $('moonchk').checked=false; $('moonsel').value=''; $('moonsel').style.display='none'; $('autohint').style.display='none'; $('valmsg').textContent=''; moonOn=false;
+    renderAll(); checkEnd();
+  };
+
+  function checkEnd(){
+    if(gameOver) return;
+    var t=getTotals();
+    var over100=[];
+    for(var i=0;i<4;i++) if(t[i]>=100) over100.push(i);
+
+    if(tieBreakMode){
+      var min=Math.min.apply(null,t);
+      var max=Math.max.apply(null,t);
+      var firsts=[],lasts=[];
+      for(var i=0;i<4;i++){ if(t[i]===min) firsts.push(i); if(t[i]===max) lasts.push(i); }
+      if(firsts.length===1&&lasts.length===1){
+        finishGame(firsts[0],lasts[0],min,max);
+      }
+      return;
+    }
+
+    if(needExtraRound){
+      needExtraRound=false;
+      var min=Math.min.apply(null,t);
+      var max=Math.max.apply(null,t);
+      var firsts=[],lasts=[];
+      for(var i=0;i<4;i++){ if(t[i]===min) firsts.push(i); if(t[i]===max) lasts.push(i); }
+      if(firsts.length===1&&lasts.length===1){
+        finishGame(firsts[0],lasts[0],min,max);
+      }else{
+        tieBreakMode=true; renderTotals();
+      }
+      return;
+    }
+
+    if(over100.length===1){
+      var min=Math.min.apply(null,t);
+      var max=Math.max.apply(null,t);
+      var firsts=[],lasts=[];
+      for(var i=0;i<4;i++){ if(t[i]===min) firsts.push(i); if(t[i]===max) lasts.push(i); }
+      if(firsts.length===1&&lasts.length===1){
+        finishGame(firsts[0],lasts[0],min,max);
+      }else{
+        tieBreakMode=true; renderTotals();
+      }
+      return;
+    }
+
+    if(over100.length>=2){
+      needExtraRound=true; renderTotals();
+      alert('⏰ '+over100.length+' نفر از ۱۰۰ گذشتن! یه دور دیگه بازی کنید، بعدش بازی تموم می‌شه.');
+      return;
+    }
+  }
+
+  function finishGame(winnerIdx,loserIdx,minScore,maxScore){
+    gameOver=true;
+    var winnerName=NAMES[winnerIdx];
+    var loserName=NAMES[loserIdx];
+    addFirst(winnerName);
+    addLast(loserName);
+    for(var r=0;r<rounds.length;r++) if(rounds[r].moon!==null) addMoon(NAMES[rounds[r].moon]);
+    renderTotals(); renderStats();
+    var resultHTML='<div style="color:#ffd700;font-size:18px;margin-bottom:8px">🏆 برنده: '+winnerName+' ('+minScore+' امتیاز)</div>';
+    resultHTML+='<div style="color:#ff5252;font-size:16px;margin-bottom:12px">💔 آخرین نفر: '+loserName+' ('+maxScore+' امتیاز)</div>';
+    resultHTML+='<div style="font-size:13px;opacity:.8">برای بازی جدید «🔄 بازی جدید» رو بزن</div>';
+    $('finish-result').innerHTML=resultHTML;
+    $('finish-modal').style.display='flex';
+  }
+
+  window.closeFinish=function(){ $('finish-modal').style.display='none'; };
+
+  window.editRound=function(idx){
+    if(gameOver) return;
+    editIdx=idx;
+    $('rtitle').textContent='✏️ ویرایش دور '+(idx+1);
+    $('sbtn').textContent='💾 ذخیره';
+    $('cbtn').style.display='inline-block';
+    renderInputs();
+    validate();
+  };
+  window.cancelEdit=function(){
+    editIdx=-1;
+    $('rtitle').textContent='➕ ثبت دور جدید';
+    $('sbtn').textContent='💾 ثبت دور';
+    $('cbtn').style.display='none';
+    moonOn=false;
+    renderInputs();
+    $('valmsg').textContent='';
+  };
+  window.delRound=function(idx){
+    if(!confirm('دور '+(idx+1)+' حذف بشه؟')) return;
+    rounds.splice(idx,1);
+    if(editIdx===idx) cancelEdit();
+    else if(editIdx>idx) editIdx--;
+    renderAll();
+  };
+
+  window.askReset=function(){ $('rmodal').style.display='flex'; };
+  window.closeReset=function(){ $('rmodal').style.display='none'; };
+  window.doReset=function(){
+    rounds=[]; penalties=[]; editIdx=-1; moonOn=false; gameOver=false; needExtraRound=false; tieBreakMode=false;
+    cancelEdit(); closeReset(); closeFinish(); renderAll();
+  };
+
+  function renderAll(){ renderTotals(); renderHistory(); renderPenalties(); if(editIdx<0) renderInputs(); }
+
+  /* ===== Init ===== */
+  storageGet(function(){
+    $('loading-box').style.display='none';
+    $('app-content').style.display='block';
+    renderStats();
+  });
+})();
+</script>
+</body>
+</html>
