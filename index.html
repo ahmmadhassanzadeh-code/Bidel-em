@@ -14,23 +14,6 @@
   h1{text-align:center;color:#ffd700;margin:0 0 4px;font-size:24px}
   .sub{text-align:center;font-size:12px;opacity:.8;margin-bottom:14px}
 
-  /* ===== Storage Status Bar ===== */
-  .status-bar{display:flex;justify-content:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-  .status-pill{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:bold;transition:.3s}
-  .status-pill.cloud{background:rgba(76,175,80,.2);color:#81c784;border:1px solid rgba(76,175,80,.4)}
-  .status-pill.local{background:rgba(255,152,0,.2);color:#ffb74d;border:1px solid rgba(255,152,0,.4)}
-  .status-pill.offline{background:rgba(244,67,54,.2);color:#ef5350;border:1px solid rgba(244,67,54,.4)}
-  .status-dot{width:8px;height:8px;border-radius:50%;animation:pulse 2s infinite}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-  .status-pill.cloud .status-dot{background:#4caf50}
-  .status-pill.local .status-dot{background:#ff9800}
-  .status-pill.offline .status-dot{background:#f44336}
-
-  /* ===== Session Warning ===== */
-  .session-warn{display:none;background:linear-gradient(90deg,#ff9800,#f57c00);color:#fff;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;text-align:center;font-weight:bold;animation:slideDown .4s ease}
-  @keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
-  .session-warn.show{display:block}
-
   .bd-btn{background:#ffd700;color:#1a472a;border:none;padding:10px 20px;border-radius:10px;font-size:15px;font-weight:bold;cursor:pointer;margin:3px;transition:.2s;font-family:inherit;touch-action:manipulation}
   .bd-btn:active{transform:scale(.96)}
   .bd-btn:hover{background:#ffea00;transform:translateY(-2px)}
@@ -86,6 +69,13 @@
 
   .loading-box{text-align:center;padding:20px;color:#ffd700;font-size:14px}
   .error-box{text-align:center;padding:16px;color:#ff5252;font-size:13px;background:rgba(255,82,82,.1);border-radius:10px;margin-bottom:12px;display:none}
+
+  .cloud-bar{background:rgba(76,175,80,.15);border:1px solid rgba(76,175,80,.3);border-radius:10px;padding:8px 12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;font-size:12px}
+  .cloud-bar.off{background:rgba(244,67,54,.15);border-color:rgba(244,67,54,.3)}
+  .cloud-bar.warn{background:rgba(255,152,0,.15);border-color:rgba(255,152,0,.3)}
+  .cloud-text{font-weight:bold;color:#81c784}
+  .cloud-text.off{color:#ef5350}
+  .cloud-text.warn{color:#ffb74d}
 </style>
 </head>
 <body>
@@ -93,20 +83,12 @@
   <h1>♥ بیدل — ثبت امتیاز ♠</h1>
   <p class="sub">ثبت امتیاز دوره‌ای بازی بیدل</p>
 
-  <!-- Storage Status Indicator -->
-  <div class="status-bar" id="status-bar" style="display:none">
-    <div class="status-pill" id="status-pill">
-      <span class="status-dot"></span>
-      <span id="status-text">در حال بررسی...</span>
-    </div>
+  <div class="cloud-bar" id="cloud-bar">
+    <span class="cloud-text" id="cloud-text">⏳ در حال اتصال...</span>
+    <button class="bd-btn sec" style="padding:4px 10px;font-size:11px" onclick="copyLink()">📋 کپی لینک</button>
   </div>
 
-  <!-- Session Warning -->
-  <div class="session-warn" id="session-warn">
-    ⚠️ ذخیره‌سازی محلی فعال است — اگر نشست Telegram بسته شود، آمار کلی از بین می‌رود!
-  </div>
-
-  <div class="loading-box" id="loading-box">⏳ در حال بررسی اتصال ذخیره‌سازی...</div>
+  <div class="loading-box" id="loading-box">⏳ در حال بارگذاری...</div>
   <div class="error-box" id="error-box"></div>
 
   <div id="app-content" style="display:none">
@@ -237,131 +219,179 @@
   var needExtraRound=false;
   var tieBreakMode=false;
   var stats={};
-  var storageReady=false;
-  var useCloud = false;
-  var storageMode = 'checking'; // 'cloud', 'local', 'offline'
+
+  // Cloud
+  var CLOUD_TYPE = 'none'; // 'telegram', 'jsonstorage', 'none'
+  var JSONSTORAGE_ID = '';
+  var syncTimer = null;
 
   function $(id){return document.getElementById(id);}
 
-  /* ===== Storage Status UI ===== */
-  function updateStorageStatus(){
-    var bar = $('status-bar');
-    var pill = $('status-pill');
-    var text = $('status-text');
-    var warn = $('session-warn');
-    
-    bar.style.display = 'flex';
-    
-    if(storageMode === 'cloud'){
-      pill.className = 'status-pill cloud';
-      text.textContent = '☁️ ذخیره‌سازی ابری — امن';
-      warn.classList.remove('show');
-    } else if(storageMode === 'local'){
-      pill.className = 'status-pill local';
-      text.textContent = '💾 ذخیره‌سازی محلی — موقت';
-      warn.classList.add('show');
-    } else if(storageMode === 'offline'){
-      pill.className = 'status-pill offline';
-      text.textContent = '❌ بدون اتصال — داده‌ها موقتی‌اند';
-      warn.classList.add('show');
+  /* ===== URL ===== */
+  function getParam(name){
+    try{ return new URLSearchParams(location.search).get(name)||''; }
+    catch(e){ return ''; }
+  }
+  function setParam(name,val){
+    try{
+      var u=new URL(location.href);
+      if(val) u.searchParams.set(name,val); else u.searchParams.delete(name);
+      history.replaceState({},'',u);
+    }catch(e){}
+  }
+
+  /* ===== Cloud Status UI ===== */
+  function setCloud(msg,type){
+    var bar=$('cloud-bar'), txt=$('cloud-text');
+    txt.textContent=msg;
+    bar.className='cloud-bar'+(type==='off'?' off':type==='warn'?' warn':'');
+    txt.className='cloud-text'+(type==='off'?' off':type==='warn'?' warn':'');
+  }
+
+  /* ===== Storage Engine ===== */
+  function initCloud(){
+    // 1. Try Telegram CloudStorage first (best experience)
+    if(tg && tg.CloudStorage){
+      tg.CloudStorage.getItem('bidel_stats',function(err,val){
+        if(!err && val){
+          try{ stats=JSON.parse(val); }catch(e){}
+        }
+        CLOUD_TYPE='telegram';
+        setCloud('☁️ ذخیره تلگرام — خودکار','ok');
+        renderStats();
+        $('loading-box').style.display='none';
+        $('app-content').style.display='block';
+      });
+      return;
+    }
+
+    // 2. Fallback to jsonstorage.net (no API key needed)
+    var existing = getParam('id');
+    if(existing){
+      JSONSTORAGE_ID = existing;
+      loadJsonStorage(existing);
     } else {
-      pill.className = 'status-pill local';
-      text.textContent = '⏳ در حال بررسی...';
+      createJsonStorage();
     }
   }
 
-  /* ===== Storage with timeout and fallback ===== */
-  function storageGet(callback){
-    var done = false;
-    var timeout = setTimeout(function(){
-      if(!done){
-        done = true;
-        // fallback to localStorage
-        var s = localStorage.getItem('bidel_stats_v2');
-        if(s){ try{ stats = JSON.parse(s); }catch(e){ stats = {}; } }
-        storageReady = true;
-        storageMode = 'local';
-        updateStorageStatus();
-        if(callback) callback();
+  function createJsonStorage(){
+    setCloud('⏳ در حال ساخت فضای ابری...','warn');
+    fetch('https://jsonstorage.net/api/items',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({__init:true})
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      console.log('Create response:',data);
+      if(data && data.id){
+        JSONSTORAGE_ID = data.id;
+        setParam('id',JSONSTORAGE_ID);
+        CLOUD_TYPE='jsonstorage';
+        setCloud('☁️ ذخیره آنلاین — لینک رو ذخیره کنید','ok');
+      } else if(data && data.uri){
+        // alternative response format
+        var parts = data.uri.split('/');
+        JSONSTORAGE_ID = parts[parts.length-1];
+        setParam('id',JSONSTORAGE_ID);
+        CLOUD_TYPE='jsonstorage';
+        setCloud('☁️ ذخیره آنلاین — لینک رو ذخیره کنید','ok');
+      } else {
+        throw new Error('فرمت پاسخ ناشناخته');
       }
-    }, 3000);
+      $('loading-box').style.display='none';
+      $('app-content').style.display='block';
+      renderStats();
+    })
+    .catch(function(err){
+      console.error('Create error:',err);
+      setCloud('❌ خطا در ساخت فضا: '+err.message,'off');
+      $('loading-box').style.display='none';
+      $('app-content').style.display='block';
+      renderStats();
+    });
+  }
 
-    // Try Telegram CloudStorage (capital C)
-    if(tg && tg.CloudStorage && tg.CloudStorage.getItem){
-      try {
-        tg.CloudStorage.getItem('bidel_stats_v2', function(err, val){
-          if(!done){
-            done = true; clearTimeout(timeout);
-            if(!err && val){
-              try{ stats = JSON.parse(val); }catch(e){ stats = {}; }
-              useCloud = true;
-              storageMode = 'cloud';
-            } else {
-              // fallback
-              var s = localStorage.getItem('bidel_stats_v2');
-              if(s){ try{ stats = JSON.parse(s); }catch(e){ stats = {}; } }
-              storageMode = 'local';
-            }
-            storageReady = true;
-            updateStorageStatus();
-            if(callback) callback();
-          }
-        });
-      } catch(e){
-        // will fallback via timeout
+  function loadJsonStorage(id){
+    setCloud('⏳ در حال لود...','warn');
+    fetch('https://jsonstorage.net/api/items/'+id)
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      console.log('Load response:',data);
+      if(data && !data.__init){
+        stats = data;
       }
+      CLOUD_TYPE='jsonstorage';
+      setCloud('☁️ ذخیره آنلاین — لینک رو ذخیره کنید','ok');
+      $('loading-box').style.display='none';
+      $('app-content').style.display='block';
+      renderStats();
+    })
+    .catch(function(err){
+      console.error('Load error:',err);
+      setCloud('❌ خطا در لود: '+err.message,'off');
+      $('loading-box').style.display='none';
+      $('app-content').style.display='block';
+      renderStats();
+    });
+  }
+
+  function saveCloud(){
+    if(CLOUD_TYPE==='telegram' && tg && tg.CloudStorage){
+      tg.CloudStorage.setItem('bidel_stats',JSON.stringify(stats));
+    } else if(CLOUD_TYPE==='jsonstorage' && JSONSTORAGE_ID){
+      fetch('https://jsonstorage.net/api/items/'+JSONSTORAGE_ID,{
+        method:'PUT',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(stats)
+      }).catch(function(e){ console.error('Sync error:',e); });
+    }
+  }
+
+  function autoSync(){
+    if(syncTimer) clearTimeout(syncTimer);
+    syncTimer = setTimeout(saveCloud,800);
+  }
+
+  window.copyLink = function(){
+    var url = new URL(location.href);
+    if(JSONSTORAGE_ID) url.searchParams.set('id',JSONSTORAGE_ID);
+    var link = url.toString();
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(link).then(function(){
+        setCloud('📋 لینک کپی شد!','ok');
+        setTimeout(function(){ setCloud('☁️ ذخیره آنلاین — لینک رو ذخیره کنید','ok'); },2000);
+      });
     } else {
-      // No CloudStorage, cancel timeout and use localStorage immediately
-      clearTimeout(timeout);
-      done = true;
-      var s = localStorage.getItem('bidel_stats_v2');
-      if(s){ try{ stats = JSON.parse(s); }catch(e){ stats = {}; } }
-      storageReady = true;
-      storageMode = tg ? 'local' : 'offline';
-      updateStorageStatus();
-      if(callback) callback();
+      var ta=document.createElement('textarea');
+      ta.value=link; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select();
+      try{ document.execCommand('copy'); setCloud('📋 لینک کپی شد!','ok'); }
+      catch(e){ setCloud('❌ کپی ناموفق','off'); }
+      document.body.removeChild(ta);
+      setTimeout(function(){ setCloud('☁️ ذخیره آنلاین — لینک رو ذخیره کنید','ok'); },2000);
     }
-  }
+  };
 
-  function storageSave(){
-    var json = JSON.stringify(stats);
-    localStorage.setItem('bidel_stats_v2', json);
-    if(useCloud && tg && tg.CloudStorage && tg.CloudStorage.setItem){
-      try{ 
-        tg.CloudStorage.setItem('bidel_stats_v2', json, function(err){
-          if(err){
-            // If cloud save fails, switch to local mode
-            useCloud = false;
-            storageMode = 'local';
-            updateStorageStatus();
-          }
-        }); 
-      }catch(e){
-        useCloud = false;
-        storageMode = 'local';
-        updateStorageStatus();
-      }
-    }
-  }
-
+  /* ===== Game Logic ===== */
   function resetStats(){
     if(!confirm('آمار کلی همه بازی‌ها پاک بشه؟')) return;
-    stats = {}; storageSave(); renderStats();
+    stats={}; renderStats(); autoSync();
   }
   function ensurePlayer(name){
-    if(!stats[name]) stats[name] = {first:0, last:0, moon:0};
+    if(!stats[name]) stats[name]={first:0,last:0,moon:0};
   }
-  function addFirst(name){ ensurePlayer(name); stats[name].first++; storageSave(); }
-  function addLast(name){ ensurePlayer(name); stats[name].last++; storageSave(); }
-  function addMoon(name){ ensurePlayer(name); stats[name].moon++; storageSave(); }
+  function addFirst(name){ ensurePlayer(name); stats[name].first++; autoSync(); }
+  function addLast(name){ ensurePlayer(name); stats[name].last++; autoSync(); }
+  function addMoon(name){ ensurePlayer(name); stats[name].moon++; autoSync(); }
 
   function getNames(){
     for(var i=0;i<4;i++){
-      var v = $('n'+i).value.trim();
-      NAMES[i] = v || ('بازیکن '+(i+1));
+      var v=$('n'+i).value.trim();
+      NAMES[i]=v||('بازیکن '+(i+1));
     }
   }
-
   function updateHeaders(){
     for(var i=0;i<4;i++){ var el=$('hh'+i); if(el) el.textContent=NAMES[i]; }
     var sel=$('moonsel'); var opts='<option value="">کی Moon زد؟</option>';
@@ -556,7 +586,7 @@
 
   function renderStats(){
     var tbody=$('stats-body');
-    var keys=Object.keys(stats);
+    var keys=Object.keys(stats).filter(function(k){ return !k.startsWith('__'); });
     if(keys.length===0){
       tbody.innerHTML='<tr><td colspan="4" class="empty-stats">هنوز آماری ثبت نشده</td></tr>';
       return;
@@ -722,11 +752,7 @@
   function renderAll(){ renderTotals(); renderHistory(); renderPenalties(); if(editIdx<0) renderInputs(); }
 
   /* ===== Init ===== */
-  storageGet(function(){
-    $('loading-box').style.display='none';
-    $('app-content').style.display='block';
-    renderStats();
-  });
+  initCloud();
 })();
 </script>
 </body>
